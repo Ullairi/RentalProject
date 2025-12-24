@@ -1,13 +1,101 @@
 from django.db import models
 from core.mixins import TimestampMixin
+from core.enums import HouseType, AmenityCategory
+from core.validators import validate_positive_price, validate_positive_number
 
+
+class Amenity(TimestampMixin):
+    """
+    Amenity model for listing
+    Using categories from core/enums
+    """
+    name = models.CharField(max_length=70, unique=True)
+    category = models.CharField(max_length=20, choices=AmenityCategory.choices())
+    description = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'amenities'
+        verbose_name = 'Amenity'
+        verbose_name_plural = 'Amenities'
+        ordering = ['category', 'name']
+        indexes = [models.Index(fields=['category'])]
+
+    def __str__(self):
+        return f'{self.name} ({self.category})'
+
+class Address(TimestampMixin):
+    """Address model for listing locations"""
+    country = models.CharField(max_length=70, default='Germany')
+    city = models.CharField(max_length=70)
+    land = models.CharField(max_length=30, blank=True)
+    street = models.CharField(max_length=50)
+    postal_code = models.CharField(max_length=5)
+
+    class Meta:
+        db_table = 'addresses'
+        verbose_name = 'Address'
+        verbose_name_plural = "Addresses"
+        indexes = [
+            models.Index(fields=['city']),
+            models.Index(fields=['postal_code']),
+        ]
+
+    def __str__(self):
+        return f'{self.street}, {self.city}, {self.land}, {self.postal_code}'
+
+    @property
+    def full_address(self):
+        """Return full address string"""
+        parts = [self.street, self.city]
+        if self.land:
+            parts.append(self.land)
+        parts.append(self.postal_code)
+        parts.append(self.country)
+        return ', '.join(parts)
 
 class Listing(TimestampMixin):
     """Listing model for Favorite model from users/models relation"""
     title = models.CharField(max_length=255)
+    owner = models.ForeignKey('users.User', on_delete=models.CASCADE,
+                              related_name='listings')
+    description = models.TextField()
+    is_active = models.BooleanField(default=True)
+    views_count = models.PositiveIntegerField(default=0)
+    address = models.OneToOneField(Address, on_delete=models.CASCADE, related_name='listing')
+    house_type = models.CharField(max_length=20, choices=HouseType.choices())
+    amenities = models.ManyToManyField(Amenity, related_name='listings', blank=True)
+    max_stayers = models.PositiveIntegerField(validators=[validate_positive_number])
+    bedrooms = models.PositiveIntegerField(validators=[validate_positive_number])
+    bathrooms = models.PositiveIntegerField(validators=[validate_positive_number])
+    price_per_night = models.DecimalField(max_digits=10, decimal_places=2, validators=[validate_positive_price])
 
     class Meta:
         db_table = 'listings'
+        verbose_name = 'Listing'
+        verbose_name_plural = 'Listings'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['owner']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['house_type']),
+            models.Index(fields=['price_per_night']),
+        ]
 
     def __str__(self):
-        return self.title
+        return f'{self.title} - {self.address.city}'
+
+
+class ListingImg(TimestampMixin):
+    """Images model for listings"""
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='images')
+    img = models.ImageField(upload_to='listings/%Y/%m/%d/')
+    main = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'listing_imgs'
+        verbose_name = 'Listing image'
+        verbose_name_plural='Listing images'
+        ordering = ['-main', '-created_at']
+
+    def __str__(self):
+        return f'Images for {self.listing.title}'
