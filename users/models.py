@@ -158,8 +158,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimestampMixin):
 
 class Favorite(TimestampMixin):
     """Wish list model"""
-    user = models.ForeignKey(
-        User,
+    user = models.ForeignKey(User,
         on_delete=models.CASCADE,
         related_name='favorites',
         verbose_name='User'
@@ -172,7 +171,7 @@ class Favorite(TimestampMixin):
     )
 
     class Meta:
-        db_table = 'user_favorites'
+        db_table = 'favorites'
         verbose_name = 'favourite'
         verbose_name_plural = 'favourites'
         unique_together = ('user', 'listing')
