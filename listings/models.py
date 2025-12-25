@@ -2,6 +2,7 @@ from django.db import models
 from core.mixins import TimestampMixin
 from core.enums import HouseType, AmenityCategory
 from core.validators import validate_positive_price, validate_positive_number
+from django.db.models import Avg
 
 
 class Amenity(TimestampMixin):
@@ -84,12 +85,26 @@ class Listing(TimestampMixin):
     def __str__(self):
         return f'{self.title} - {self.address.city}'
 
+    @property
+    def avg_rating(self):
+        """Calculate average rating from reviews"""
+        result = self.reviews.aggregate(avg=Avg('rating'))
+        return result['avg']
+
 
 class ListingImg(TimestampMixin):
     """Images model for listings"""
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='images')
     img = models.ImageField(upload_to='listings/%Y/%m/%d/')
     main = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if self.main:
+            ListingImg.objects.filter(
+                listing=self.listing,
+                main=True
+            ).exclude(pk=self.pk).update(main=False)
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'listing_imgs'
@@ -98,4 +113,4 @@ class ListingImg(TimestampMixin):
         ordering = ['-main', '-created_at']
 
     def __str__(self):
-        return f'Images for {self.listing.title}'
+        return f'Image #{self.pk}'
